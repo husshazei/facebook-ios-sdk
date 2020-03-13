@@ -16,15 +16,34 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#import <sys/utsname.h>
 #import <XCTest/XCTest.h>
+#import <OCMock/OCMock.h>
 
 #import "FBSDKCoreKit+Internal.h"
+#import "TestCoder.h"
 #import "TestMonitorEntry.h"
 
 @interface FBSDKMonitorEntryTests : XCTestCase
+
+@property (nonatomic) FBSDKMonitorEntry *entry;
+
 @end
 
 @implementation FBSDKMonitorEntryTests
+
+- (void)setUp
+{
+  [super setUp];
+
+  [FBSDKSettings setAppID:@"abc123"];
+  self.entry = [TestMonitorEntry testEntry];
+}
+
+- (void)tearDown
+{
+  [FBSDKSettings setAppID:nil];
+}
 
 - (void)testDirectInitialization
 {
@@ -32,23 +51,45 @@
                @"Should not be able to directly initialize the base class for monitor entries");
 }
 
-- (void)testAppID
-{
-  [FBSDKSettings setAppID:@"abc123"];
-  FBSDKMonitorEntry *entry = [TestMonitorEntry testEntry];
-  NSDictionary *dict = [entry dictionaryRepresentation];
+- (void)testDictionaryRepresentation {
+  UIDevice *deviceStub = OCMPartialMock([UIDevice currentDevice]);
+  [OCMStub([deviceStub systemVersion]) andReturn: @"foo"];
+
+  self.entry = [TestMonitorEntry testEntry];
+  NSDictionary *dict = [self.entry dictionaryRepresentation];
 
   XCTAssertEqualObjects([dict objectForKey:@"appID"], @"abc123",
-                 @"A monitor entry's appID should be gleaned from settings");
+                        @"A monitor entry's appID should be gleaned from settings");
+  XCTAssertEqualObjects([dict objectForKey:@"device_os_version"], @"foo",
+                        @"An entry should store the current device's os version");
+  XCTAssertEqualObjects([dict objectForKey:@"device_model"], [FBSDKMonitorEntryTests deviceModel],
+                        @"An entry's device model should be available");
 }
 
-- (void)testEncoding
+- (void)testCodability
 {
-  [FBSDKSettings setAppID:@"abc123"];
-  FBSDKMonitorEntry *entry = [TestMonitorEntry testEntry];
+  self.entry = [TestMonitorEntry testEntry];
+  TestCoder *coder = [TestCoder new];
 
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:entry];
-  XCTAssertNotNil(data, @"Monitor entries should be encodable to data");
+  [self.entry encodeWithCoder:coder];
+
+  XCTAssertEqualObjects(coder.encodedObject[@"appID"], @"abc123",
+                        @"A monitor entry's appID should be gleaned from settings");
+  XCTAssertEqualObjects(coder.encodedObject[@"device_os_version"], UIDevice.currentDevice.systemVersion,
+                        @"An entry should store the current device's os version");
+  XCTAssertEqualObjects(coder.encodedObject[@"device_model"], [FBSDKMonitorEntryTests deviceModel],
+                        @"An entry's device model should be available");
+}
+
+// MARK: Helpers
+
++ (NSString *)deviceModel
+{
+  struct utsname systemInfo;
+  uname(&systemInfo);
+
+  return [NSString stringWithCString:systemInfo.machine
+                            encoding:NSUTF8StringEncoding];
 }
 
 @end
