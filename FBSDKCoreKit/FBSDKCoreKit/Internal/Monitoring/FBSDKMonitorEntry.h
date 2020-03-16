@@ -18,6 +18,8 @@
 
 #import <Foundation/Foundation.h>
 
+#import "FBSDKBasicUtility.h"
+
 NS_ASSUME_NONNULL_BEGIN
 
 /**
@@ -26,9 +28,7 @@ NS_ASSUME_NONNULL_BEGIN
  For example a PerformanceMonitorEntry subclass may have additional fields for
  capturing an event with a name, and start / end times.
 */
-@interface FBSDKMonitorEntry : NSObject<NSCoding>
-
-@property (nonatomic, copy) NSString * appID;
+@interface FBSDKMonitorEntry : NSObject<NSCoding, FBSDKDictionaryRepresentable>
 
 + (instancetype)new NS_UNAVAILABLE;
 
